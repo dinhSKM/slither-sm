@@ -39,7 +39,8 @@ def output_to_json(filename: Optional[str], error, results: Dict) -> None:
     :return:
     """
     # Create our encapsulated JSON result.
-    json_result = {"success": error is None, "error": error, "results": results}
+    json_result = {"success": error is None,
+                   "error": error, "results": results}
 
     if filename == "-":
         filename = None
@@ -48,13 +49,14 @@ def output_to_json(filename: Optional[str], error, results: Dict) -> None:
     if filename is None:
         # Write json to console
         print(json.dumps(json_result))
-    else:
+    # else:
         # Write json to file
-        if os.path.isfile(filename):
-            logger.info(yellow(f"{filename} exists already, the overwrite is prevented"))
-        else:
-            with open(filename, "w", encoding="utf8") as f:
-                json.dump(json_result, f, indent=2)
+        # if os.path.isfile(filename):
+        #     logger.info(
+        #         yellow(f"{filename} exists already, the overwrite is prevented"))
+        # else:
+        # with open(filename, "w", encoding="utf8") as f:
+        #     json.dump(json_result, f, indent=2)
 
 
 def _output_result_to_sarif(
@@ -76,7 +78,8 @@ def _output_result_to_sarif(
     elif detector["impact"] == "Low":
         risk = "3.0"
 
-    detector_class = next((d for d in detectors_classes if d.ARGUMENT == detector["check"]))
+    detector_class = next(
+        (d for d in detectors_classes if d.ARGUMENT == detector["check"]))
     check_id = (
         str(detector_class.IMPACT.value)
         + "-"
@@ -97,9 +100,11 @@ def _output_result_to_sarif(
         sarif["runs"][0]["tool"]["driver"]["rules"].append(rule)
 
     if not detector["elements"]:
-        logger.info(yellow("Cannot generate Github security alert for finding without location"))
+        logger.info(
+            yellow("Cannot generate Github security alert for finding without location"))
         logger.info(yellow(detector["description"]))
-        logger.info(yellow("This will be supported in a future Slither release"))
+        logger.info(
+            yellow("This will be supported in a future Slither release"))
         return
 
     # From 3.19.10 (http://docs.oasis-open.org/sarif/sarif/v2.0/csprd01/sarif-v2.0-csprd01.html)
@@ -172,7 +177,8 @@ def output_to_sarif(
     else:
         # Write json to file
         if os.path.isfile(filename):
-            logger.info(yellow(f"{filename} exists already, the overwrite is prevented"))
+            logger.info(
+                yellow(f"{filename} exists already, the overwrite is prevented"))
         else:
             with open(filename, "w", encoding="utf8") as f:
                 json.dump(sarif, f, indent=2)
@@ -198,16 +204,19 @@ def output_to_zip(filename: str, error: Optional[str], results: Dict, zip_type: 
     :param results:
     :return:
     """
-    json_result = {"success": error is None, "error": error, "results": results}
+    json_result = {"success": error is None,
+                   "error": error, "results": results}
     if os.path.isfile(filename):
-        logger.info(yellow(f"{filename} exists already, the overwrite is prevented"))
+        logger.info(
+            yellow(f"{filename} exists already, the overwrite is prevented"))
     else:
         with ZipFile(
             filename,
             "w",
             compression=ZIP_TYPES_ACCEPTED.get(zip_type, zipfile.ZIP_LZMA),
         ) as file_desc:
-            file_desc.writestr("slither_results.json", json.dumps(json_result).encode("utf8"))
+            file_desc.writestr("slither_results.json",
+                               json.dumps(json_result).encode("utf8"))
 
 
 # endregion
@@ -223,7 +232,8 @@ def _convert_to_description(d):
         return d
 
     if not isinstance(d, SourceMapping):
-        raise SlitherError(f"{d} does not inherit from SourceMapping, conversion impossible")
+        raise SlitherError(
+            f"{d} does not inherit from SourceMapping, conversion impossible")
 
     if isinstance(d, Node):
         if d.expression:
@@ -236,7 +246,8 @@ def _convert_to_description(d):
     if hasattr(d, "name"):
         return f"{d.name} ({d.source_mapping})"
 
-    raise SlitherError(f"{type(d)} cannot be converted (no name, or canonical_name")
+    raise SlitherError(
+        f"{type(d)} cannot be converted (no name, or canonical_name")
 
 
 def _convert_to_markdown(d, markdown_root):
@@ -244,7 +255,8 @@ def _convert_to_markdown(d, markdown_root):
         return d
 
     if not isinstance(d, SourceMapping):
-        raise SlitherError(f"{d} does not inherit from SourceMapping, conversion impossible")
+        raise SlitherError(
+            f"{d} does not inherit from SourceMapping, conversion impossible")
 
     if isinstance(d, Node):
         if d.expression:
@@ -257,7 +269,8 @@ def _convert_to_markdown(d, markdown_root):
     if hasattr(d, "name"):
         return f"[{d.name}]({d.source_mapping.to_markdown(markdown_root)})"
 
-    raise SlitherError(f"{type(d)} cannot be converted (no name, or canonical_name")
+    raise SlitherError(
+        f"{type(d)} cannot be converted (no name, or canonical_name")
 
 
 def _convert_to_id(d):
@@ -270,7 +283,8 @@ def _convert_to_id(d):
         return d
 
     if not isinstance(d, SourceMapping):
-        raise SlitherError(f"{d} does not inherit from SourceMapping, conversion impossible")
+        raise SlitherError(
+            f"{d} does not inherit from SourceMapping, conversion impossible")
 
     if isinstance(d, Node):
         if d.expression:
@@ -286,7 +300,8 @@ def _convert_to_id(d):
     if hasattr(d, "name"):
         return f"{d.name}"
 
-    raise SlitherError(f"{type(d)} cannot be converted (no name, or canonical_name")
+    raise SlitherError(
+        f"{type(d)} cannot be converted (no name, or canonical_name")
 
 
 # endregion
@@ -304,7 +319,8 @@ def _create_base_element(
         additional_fields = {}
     if type_specific_fields is None:
         type_specific_fields = {}
-    element = {"type": custom_type, "name": name, "source_mapping": source_mapping}
+    element = {"type": custom_type, "name": name,
+               "source_mapping": source_mapping}
     if type_specific_fields:
         element["type_specific_fields"] = type_specific_fields
     if additional_fields:
@@ -336,7 +352,8 @@ def _create_parent_element(element):
     return None
 
 
-SupportedOutput = Union[Variable, Contract, Function, Enum, Event, Structure, Pragma, Node]
+SupportedOutput = Union[Variable, Contract,
+                        Function, Enum, Event, Structure, Pragma, Node]
 AllSupportedOutput = Union[str, SupportedOutput]
 
 
@@ -360,8 +377,10 @@ class Output:
 
         self._data = OrderedDict()
         self._data["elements"] = []
-        self._data["description"] = "".join(_convert_to_description(d) for d in info)
-        self._data["markdown"] = "".join(_convert_to_markdown(d, markdown_root) for d in info)
+        self._data["description"] = "".join(
+            _convert_to_description(d) for d in info)
+        self._data["markdown"] = "".join(
+            _convert_to_markdown(d, markdown_root) for d in info)
         self._data["first_markdown_element"] = ""
         self._markdown_root = markdown_root
 
@@ -599,7 +618,8 @@ class Output:
         if additional_fields is None:
             additional_fields = {}
         type_specific_fields = {"filename": filename, "content": content}
-        element = _create_base_element("file", type_specific_fields, additional_fields)
+        element = _create_base_element(
+            "file", type_specific_fields, additional_fields)
 
         self._data["elements"].append(element)
 
@@ -619,7 +639,8 @@ class Output:
         if additional_fields is None:
             additional_fields = {}
         type_specific_fields = {"content": content.to_json(), "name": name}
-        element = _create_base_element("pretty_table", type_specific_fields, additional_fields)
+        element = _create_base_element(
+            "pretty_table", type_specific_fields, additional_fields)
 
         self._data["elements"].append(element)
 
@@ -669,5 +690,7 @@ class Output:
             source_mapping = source_mapping.source_mapping.to_json()
 
         # Create the underlying element and add it to our resulting json
-        element = _create_base_element("other", name, source_mapping, {}, additional_fields)
+        element = _create_base_element(
+            "other", name, source_mapping, {}, additional_fields)
         self._data["elements"].append(element)
+# endregion

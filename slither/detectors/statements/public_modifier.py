@@ -5,14 +5,14 @@ from slither.core.declarations import Contract
 from slither.utils.output import Output
 
 
-
 def detect_no_modifier(contract: Contract) -> List[Node]:
     results: List[Node] = []
     for f in contract.functions_entry_points:
-            if f.is_empty is not None:
-                    if f.name not in  ["constructor", "initialize"] and f.visibility in ["public", "external"] and f.modifiers == [] and not f.pure and not f.view:
-                        results.append(f.entry_point)
+        if f.is_empty is not None:
+            if f.name not in ["constructor", "initialize", "fallback", "receivce"] and f.visibility in ["public", "external"] and f.modifiers == [] and not f.pure and not f.view:
+                results.append(f.entry_point)
     return results
+
 
 class NoModifier(AbstractDetector):
     """
@@ -63,7 +63,8 @@ Carefully check that the function called by `delegatecall` is not payable/doesn'
             for node in values:
                 func = node.function
 
-                info = ["Function ", func, " is public/external but no modifiers: ", node, "\n"]
+                info = ["Function ", func,
+                        " is public/external but no modifiers: ", node, "\n"]
                 res = self.generate_result(info)
                 results.append(res)
 

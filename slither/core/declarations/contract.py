@@ -60,8 +60,10 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
 
         self._name: Optional[str] = None
         self._id: Optional[int] = None
-        self._inheritance: List["Contract"] = []  # all contract inherited, c3 linearization
-        self._immediate_inheritance: List["Contract"] = []  # immediate inheritance
+        # all contract inherited, c3 linearization
+        self._inheritance: List["Contract"] = []
+        # immediate inheritance
+        self._immediate_inheritance: List["Contract"] = []
 
         # Constructors called on contract's definition
         # contract B is A(1) { ..
@@ -70,6 +72,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
         self._enums: Dict[str, "EnumContract"] = {}
         self._structures: Dict[str, "StructureContract"] = {}
         self._events: Dict[str, "Event"] = {}
+        # map accessible variable from name -> variable
+        # do not contain private variables inherited from contract
         self._variables: Dict[str, "StateVariable"] = {}
         self._variables_ordered: List["StateVariable"] = []
         self._modifiers: Dict[str, "Modifier"] = {}
@@ -79,6 +83,7 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
 
         # The only str is "*"
         self._using_for: Dict[Union[str, Type], List[Type]] = {}
+        self._using_for_complete: Dict[Union[str, Type], List[Type]] = None
         self._kind: Optional[str] = None
         self._is_interface: bool = False
         self._is_library: bool = False
@@ -88,6 +93,7 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
 
         self._is_upgradeable: Optional[bool] = None
         self._is_upgradeable_proxy: Optional[bool] = None
+        self._upgradeable_version: Optional[str] = None
 
         self.is_top_level = False  # heavily used, so no @property
 
@@ -95,7 +101,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
 
         self._is_incorrectly_parsed: bool = False
 
-        self._available_functions_as_dict: Optional[Dict[str, "Function"]] = None
+        self._available_functions_as_dict: Optional[Dict[str,
+                                                         "Function"]] = None
         self._all_functions_called: Optional[List["InternalCallType"]] = None
 
         self.compilation_unit: "SlitherCompilationUnit" = compilation_unit
@@ -265,6 +272,27 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def using_for(self) -> Dict[Union[str, Type], List[Type]]:
         return self._using_for
 
+    @property
+    def using_for_complete(self) -> Dict[Union[str, Type], List[Type]]:
+        """
+        Dict[Union[str, Type], List[Type]]: Dict of merged local using for directive with top level directive
+        """
+
+        def _merge_using_for(uf1, uf2):
+            result = {**uf1, **uf2}
+            for key, value in result.items():
+                if key in uf1 and key in uf2:
+                    result[key] = value + uf1[key]
+            return result
+
+        if self._using_for_complete is None:
+            result = self.using_for
+            top_level_using_for = self.file_scope.using_for_directives
+            for uftl in top_level_using_for:
+                result = _merge_using_for(result, uftl.using_for)
+            self._using_for_complete = result
+        return self._using_for_complete
+
     # endregion
     ###################################################################################
     ###################################################################################
@@ -307,7 +335,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     @property
     def variables(self) -> List["StateVariable"]:
         """
-        list(StateVariable): List of the state variables. Alias to self.state_variables
+        Returns all the accessible variables (do not include private variable from inherited contract)
+        list(StateVariable): List of the state variables. Alias to self.state_variables.
         """
         return list(self.state_variables)
 
@@ -318,6 +347,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     @property
     def state_variables(self) -> List["StateVariable"]:
         """
+        Returns all the accessible variables (do not include private variable from inherited contract).
+        Use state_variables_ordered for all the variables following the storage order
         list(StateVariable): List of the state variables.
         """
         return list(self._variables.values())
@@ -358,8 +389,10 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
         """
         List all of the slithir variables (non SSA)
         """
-        slithir_variabless = [f.slithir_variables for f in self.functions + self.modifiers]  # type: ignore
-        slithir_variables = [item for sublist in slithir_variabless for item in sublist]
+        slithir_variabless = [
+            f.slithir_variables for f in self.functions + self.modifiers]  # type: ignore
+        slithir_variables = [
+            item for sublist in slithir_variabless for item in sublist]
         return list(set(slithir_variables))
 
     @property
@@ -370,18 +403,19 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
         Returns the state variables used in reentrant targets. Heuristics:
         - Variable used (read/write) in entry points that are reentrant
         - State variables that are public
-
         """
         from slither.core.variables.state_variable import StateVariable
 
         if self._state_variables_used_in_reentrant_targets is None:
-            reentrant_functions = [f for f in self.functions_entry_points if f.is_reentrant]
+            reentrant_functions = [
+                f for f in self.functions_entry_points if f.is_reentrant]
             variables_used: Dict[
                 StateVariable, Set[Union[StateVariable, "Function"]]
             ] = defaultdict(set)
             for function in reentrant_functions:
                 for ir in function.all_slithir_operations():
-                    state_variables = [v for v in ir.used if isinstance(v, StateVariable)]
+                    state_variables = [
+                        v for v in ir.used if isinstance(v, StateVariable)]
                     for state_variable in state_variables:
                         variables_used[state_variable].add(ir.node.function)
             for variable in [v for v in self.state_variables if v.visibility == "public"]:
@@ -435,11 +469,9 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def explicit_base_constructor_calls(self) -> List["Function"]:
         """
         list(Function): List of the base constructors called explicitly by this contract definition.
-
                         Base constructors called by any constructor definition will not be included.
                         Base constructors implicitly called by the contract definition (without
                         parenthesis) will not be included.
-
                         On "contract B is A(){..}" it returns the constructor of A
         """
         return [c.constructor for c in self._explicit_base_constructor_calls if c.constructor]
@@ -462,7 +494,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
                 v.full_name for v in self.state_variables if v.visibility in ["public", "external"]
             ]
 
-            sigs += {f.full_name for f in self.functions if f.visibility in ["public", "external"]}
+            sigs += {f.full_name for f in self.functions if f.visibility in [
+                "public", "external"]}
             self._signatures = list(set(sigs))
         return self._signatures
 
@@ -507,7 +540,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def set_functions(self, functions: Dict[str, "FunctionContract"]):
         """
         Set the functions
-
         :param functions:  dict full_name -> function
         :return:
         """
@@ -551,7 +583,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def set_modifiers(self, modifiers: Dict[str, "Modifier"]):
         """
         Set the modifiers
-
         :param modifiers:  dict full_name -> modifier
         :return:
         """
@@ -598,7 +629,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
         getter_available: Callable[["Contract"], List["FunctionContract"]],
     ) -> Dict[str, "Function"]:
         """
-
         :param elements: dict(canonical_name -> elements)
         :param getter_available: fun x
         :return:
@@ -701,7 +731,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
             Function
         """
         return next(
-            (f for f in self.functions if f.full_name == full_name and not f.is_shadowed),
+            (f for f in self.functions if f.full_name ==
+             full_name and not f.is_shadowed),
             None,
         )
 
@@ -725,11 +756,11 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def get_modifier_from_signature(self, modifier_signature: str) -> Optional["Modifier"]:
         """
         Return a modifier from a signature
-
         :param modifier_signature:
         """
         return next(
-            (m for m in self.modifiers if m.full_name == modifier_signature and not m.is_shadowed),
+            (m for m in self.modifiers if m.full_name ==
+             modifier_signature and not m.is_shadowed),
             None,
         )
 
@@ -756,7 +787,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def get_state_variable_from_name(self, variable_name: str) -> Optional["StateVariable"]:
         """
         Return a state variable from a name
-
         :param variable_name:
         """
         return next((v for v in self.state_variables if v.name == variable_name), None)
@@ -840,10 +870,10 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
             (core.Function)
         Returns:
             list(core.Function)
-
         """
         candidatess = [c.functions_declared for c in self.inheritance]
-        candidates = [candidate for sublist in candidatess for candidate in sublist]
+        candidates = [
+            candidate for sublist in candidatess for candidate in sublist]
         return [f for f in candidates if f.full_name == function.full_name]
 
     # endregion
@@ -860,17 +890,21 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
         Includes super, and private/internal functions not shadowed
         """
         if self._all_functions_called is None:
-            all_functions = [f for f in self.functions + self.modifiers if not f.is_shadowed]  # type: ignore
-            all_callss = [f.all_internal_calls() for f in all_functions] + [list(all_functions)]
+            all_functions = [f for f in self.functions +
+                             self.modifiers if not f.is_shadowed]  # type: ignore
+            all_callss = [f.all_internal_calls()
+                          for f in all_functions] + [list(all_functions)]
             all_calls = [item for sublist in all_callss for item in sublist]
             all_calls = list(set(all_calls))
 
-            all_constructors = [c.constructor for c in self.inheritance if c.constructor]
+            all_constructors = [
+                c.constructor for c in self.inheritance if c.constructor]
             all_constructors = list(set(all_constructors))
 
             set_all_calls = set(all_calls + list(all_constructors))
 
-            self._all_functions_called = [c for c in set_all_calls if isinstance(c, Function)]
+            self._all_functions_called = [
+                c for c in set_all_calls if isinstance(c, Function)]
         return self._all_functions_called
 
     @property
@@ -904,8 +938,10 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
         """
         list((Contract, Function): List all of the libraries func called
         """
-        all_high_level_callss = [f.all_library_calls() for f in self.functions + self.modifiers]  # type: ignore
-        all_high_level_calls = [item for sublist in all_high_level_callss for item in sublist]
+        all_high_level_callss = [f.all_library_calls(
+        ) for f in self.functions + self.modifiers]  # type: ignore
+        all_high_level_calls = [
+            item for sublist in all_high_level_callss for item in sublist]
         return list(set(all_high_level_calls))
 
     @property
@@ -913,8 +949,10 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
         """
         list((Contract, Function|Variable)): List all of the external high level calls
         """
-        all_high_level_callss = [f.all_high_level_calls() for f in self.functions + self.modifiers]  # type: ignore
-        all_high_level_calls = [item for sublist in all_high_level_callss for item in sublist]
+        all_high_level_callss = [f.all_high_level_calls(
+        ) for f in self.functions + self.modifiers]  # type: ignore
+        all_high_level_calls = [
+            item for sublist in all_high_level_callss for item in sublist]
         return list(set(all_high_level_calls))
 
     # endregion
@@ -926,7 +964,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
 
     def get_summary(self, include_shadowed=True) -> Tuple[str, List[str], List[str], List, List]:
         """Return the function summary
-
         :param include_shadowed: boolean to indicate if shadowed functions should be included (default True)
         Returns:
             (str, list, list, list, list): (name, inheritance, variables, fuction summaries, modifier summaries)
@@ -947,7 +984,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
 
     def is_signature_only(self) -> bool:
         """Detect if the contract has only abstract functions
-
         Returns:
             bool: true if the function are abstract functions
         """
@@ -982,7 +1018,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc20(self) -> bool:
         """
             Check if the contract is an erc20 token
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc20
         """
@@ -992,7 +1027,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc165(self) -> bool:
         """
             Check if the contract is an erc165 token
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc165
         """
@@ -1002,7 +1036,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc1820(self) -> bool:
         """
             Check if the contract is an erc1820
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc165
         """
@@ -1012,7 +1045,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc223(self) -> bool:
         """
             Check if the contract is an erc223 token
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc223
         """
@@ -1022,7 +1054,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc721(self) -> bool:
         """
             Check if the contract is an erc721 token
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc721
         """
@@ -1032,7 +1063,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc777(self) -> bool:
         """
             Check if the contract is an erc777
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc165
         """
@@ -1042,7 +1072,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc1155(self) -> bool:
         """
             Check if the contract is an erc1155
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc1155
         """
@@ -1052,7 +1081,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc4626(self) -> bool:
         """
             Check if the contract is an erc4626
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc4626
         """
@@ -1062,7 +1090,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc2612(self) -> bool:
         """
             Check if the contract is an erc2612
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc2612
         """
@@ -1072,7 +1099,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc1363(self) -> bool:
         """
             Check if the contract is an erc1363
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc1363
         """
@@ -1082,7 +1108,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_erc4524(self) -> bool:
         """
             Check if the contract is an erc4524
-
             Note: it does not check for correct return values
         :return: Returns a true if the contract is an erc4524
         """
@@ -1107,7 +1132,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_possible_erc20(self) -> bool:
         """
         Checks if the provided contract could be attempting to implement ERC20 standards.
-
         :return: Returns a boolean indicating if the provided contract met the token standard.
         """
         # We do not check for all the functions, as name(), symbol(), might give too many FPs
@@ -1121,7 +1145,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def is_possible_erc721(self) -> bool:
         """
         Checks if the provided contract could be attempting to implement ERC721 standards.
-
         :return: Returns a boolean indicating if the provided contract met the token standard.
         """
         # We do not check for all the functions, as name(), symbol(), might give too many FPs
@@ -1203,7 +1226,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
             self._is_upgradeable = False
             if self.is_upgradeable_proxy:
                 return False
-            initializable = self.file_scope.get_contract_from_name("Initializable")
+            initializable = self.file_scope.get_contract_from_name(
+                "Initializable")
             if initializable:
                 if initializable in self.inheritance:
                     self._is_upgradeable = True
@@ -1220,6 +1244,10 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
                         self._is_upgradeable = True
                         break
         return self._is_upgradeable
+
+    @is_upgradeable.setter
+    def is_upgradeable(self, upgradeable: bool):
+        self._is_upgradeable = upgradeable
 
     @property
     def is_upgradeable_proxy(self) -> bool:
@@ -1245,6 +1273,18 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
                                     self._is_upgradeable_proxy = True
                                     return self._is_upgradeable_proxy
         return self._is_upgradeable_proxy
+
+    @is_upgradeable_proxy.setter
+    def is_upgradeable_proxy(self, upgradeable_proxy: bool):
+        self._is_upgradeable_proxy = upgradeable_proxy
+
+    @property
+    def upgradeable_version(self) -> Optional[str]:
+        return self._upgradeable_version
+
+    @upgradeable_version.setter
+    def upgradeable_version(self, version_name: str):
+        self._upgradeable_version = version_name
 
     # endregion
     ###################################################################################
@@ -1272,14 +1312,17 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
             for (idx, variable_candidate) in enumerate(self.state_variables):
                 if variable_candidate.expression and not variable_candidate.is_constant:
 
-                    constructor_variable = FunctionContract(self.compilation_unit)
-                    constructor_variable.set_function_type(FunctionType.CONSTRUCTOR_VARIABLES)
+                    constructor_variable = FunctionContract(
+                        self.compilation_unit)
+                    constructor_variable.set_function_type(
+                        FunctionType.CONSTRUCTOR_VARIABLES)
                     constructor_variable.set_contract(self)
                     constructor_variable.set_contract_declarer(self)
                     constructor_variable.set_visibility("internal")
                     # For now, source mapping of the constructor variable is the whole contract
                     # Could be improved with a targeted source mapping
-                    constructor_variable.set_offset(self.source_mapping, self.compilation_unit)
+                    constructor_variable.set_offset(
+                        self.source_mapping, self.compilation_unit)
                     self._functions[constructor_variable.canonical_name] = constructor_variable
 
                     prev_node = self._create_node(
@@ -1287,7 +1330,7 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
                     )
                     variable_candidate.node_initialization = prev_node
                     counter = 1
-                    for v in self.state_variables[idx + 1 :]:
+                    for v in self.state_variables[idx + 1:]:
                         if v.expression and not v.is_constant:
                             next_node = self._create_node(
                                 constructor_variable, counter, v, prev_node.scope
@@ -1302,7 +1345,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
             for (idx, variable_candidate) in enumerate(self.state_variables):
                 if variable_candidate.expression and variable_candidate.is_constant:
 
-                    constructor_variable = FunctionContract(self.compilation_unit)
+                    constructor_variable = FunctionContract(
+                        self.compilation_unit)
                     constructor_variable.set_function_type(
                         FunctionType.CONSTRUCTOR_CONSTANT_VARIABLES
                     )
@@ -1311,7 +1355,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
                     constructor_variable.set_visibility("internal")
                     # For now, source mapping of the constructor variable is the whole contract
                     # Could be improved with a targeted source mapping
-                    constructor_variable.set_offset(self.source_mapping, self.compilation_unit)
+                    constructor_variable.set_offset(
+                        self.source_mapping, self.compilation_unit)
                     self._functions[constructor_variable.canonical_name] = constructor_variable
 
                     prev_node = self._create_node(
@@ -1319,7 +1364,7 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
                     )
                     variable_candidate.node_initialization = prev_node
                     counter = 1
-                    for v in self.state_variables[idx + 1 :]:
+                    for v in self.state_variables[idx + 1:]:
                         if v.expression and v.is_constant:
                             next_node = self._create_node(
                                 constructor_variable, counter, v, prev_node.scope
@@ -1369,7 +1414,6 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def convert_expression_to_slithir_ssa(self):
         """
         Assume generate_slithir_and_analyze was called on all functions
-
         :return:
         """
         from slither.slithir.variables import StateIRVariable
@@ -1404,7 +1448,8 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
                 last_state_variables_instances[variable_name] += instances
 
         for func in self.functions + self.modifiers:
-            func.fix_phi(last_state_variables_instances, initial_state_variables_instances)
+            func.fix_phi(last_state_variables_instances,
+                         initial_state_variables_instances)
 
     # endregion
     ###################################################################################
@@ -1429,4 +1474,4 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
     def __hash__(self):
         return self._id
 
-    # endregion
+# endregion

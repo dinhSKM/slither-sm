@@ -2,6 +2,8 @@
     Module printing summary of the contract
 """
 
+import os
+
 from slither.printers.abstract_printer import AbstractPrinter
 from slither.utils.myprettytable import MyPrettyTable
 
@@ -17,7 +19,7 @@ class FunctionSummary(AbstractPrinter):
     def _convert(l):
         if l:
             n = 2
-            l = [l[i : i + n] for i in range(0, len(l), n)]
+            l = [l[i: i + n] for i in range(0, len(l), n)]
             l = [str(x) for x in l]
             return "\n".join(l)
         return str(l)
@@ -31,11 +33,14 @@ class FunctionSummary(AbstractPrinter):
 
         all_tables = []
         all_txt = ""
+        if os.path.exists("print-report.md"):
+            os.remove("print-report.md")
+
         for c in self.contracts:
-            warn_func = []
             if c.is_top_level:
                 continue
-            (name, inheritance, var, func_summaries, modif_summaries) = c.get_summary()
+            (name, inheritance, var, func_summaries,
+             modif_summaries) = c.get_summary()
             txt = f"\nContract {name}"
             txt += "\nContract vars: " + str(var)
             txt += "\nInheritance:: " + str(inheritance)
@@ -43,7 +48,6 @@ class FunctionSummary(AbstractPrinter):
                 [
                     "Function",
                     "Visibility",
-                    "Behaviour",
                     "Modifiers",
                     "Read",
                     "Write",
@@ -52,9 +56,6 @@ class FunctionSummary(AbstractPrinter):
                 ]
             )
             for (
-                ispure,
-                isview,
-                ispayble,
                 _c_name,
                 f_name,
                 visi,
@@ -64,26 +65,15 @@ class FunctionSummary(AbstractPrinter):
                 internal_calls,
                 external_calls,
             ) in func_summaries:
-                behav = None
-                if ispure:
-                    behav = 'pure'
-                elif isview:
-                    behav = 'view'
-                elif ispayble:
-                    behav = 'payable'
-                read = self._convert(read)
-                write = self._convert(write)
-                internal_calls = self._convert(internal_calls)
-                external_calls = self._convert(external_calls)
-                if visi in ['public', 'external']:
-                    if modifiers == []:
-                        warn_func.append([visi, f_name])
+                read = self._convert(sorted(read))
+                write = self._convert(sorted(write))
+                internal_calls = self._convert(sorted(internal_calls))
+                external_calls = self._convert(sorted(external_calls))
                 table.add_row(
                     [
                         f_name,
                         visi,
-                        behav,
-                        modifiers,
+                        sorted(modifiers),
                         read,
                         write,
                         internal_calls,
@@ -102,9 +92,6 @@ class FunctionSummary(AbstractPrinter):
                 ]
             )
             for (
-                _,
-                _,
-                _,
                 _c_name,
                 f_name,
                 visi,
@@ -114,15 +101,13 @@ class FunctionSummary(AbstractPrinter):
                 internal_calls,
                 external_calls,
             ) in modif_summaries:
-                read = self._convert(read)
-                write = self._convert(write)
-                internal_calls = self._convert(internal_calls)
-                external_calls = self._convert(external_calls)
-                table.add_row([f_name, visi, read, write, internal_calls, external_calls])
+                read = self._convert(sorted(read))
+                write = self._convert(sorted(write))
+                internal_calls = self._convert(sorted(internal_calls))
+                external_calls = self._convert(sorted(external_calls))
+                table.add_row([f_name, visi, read, write,
+                              internal_calls, external_calls])
             txt += "\n\n" + str(table)
-            txt += "\n\nList of function public/external without modifiers:"
-            for i in warn_func:
-                txt += '\n' + str(i)
             txt += "\n"
             self.info(txt)
 

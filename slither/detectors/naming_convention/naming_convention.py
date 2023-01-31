@@ -47,7 +47,7 @@ Solidity defines a [naming convention](https://solidity.readthedocs.io/en/v0.4.2
     def is_mixed_case_with_underscore(name):
         # Allow _ at the beginning to represent private variable
         # or unused parameters
-        return re.search("^[_]?[a-z]([A-Za-z0-9]+)?_?$", name) is not None
+        return re.search("^[_]+[a-z]([A-Za-z0-9]+)?_?$", name) is not None
 
     @staticmethod
     def is_upper_case_with_underscores(name):
@@ -66,7 +66,8 @@ Solidity defines a [naming convention](https://solidity.readthedocs.io/en/v0.4.2
                 info = ["Contract ", contract, " is not in CapWords\n"]
 
                 res = self.generate_result(info)
-                res.add(contract, {"target": "contract", "convention": "CapWords"})
+                res.add(contract, {"target": "contract",
+                        "convention": "CapWords"})
                 results.append(res)
 
             for struct in contract.structures_declared:
@@ -74,7 +75,8 @@ Solidity defines a [naming convention](https://solidity.readthedocs.io/en/v0.4.2
                     info = ["Struct ", struct, " is not in CapWords\n"]
 
                     res = self.generate_result(info)
-                    res.add(struct, {"target": "structure", "convention": "CapWords"})
+                    res.add(struct, {"target": "structure",
+                            "convention": "CapWords"})
                     results.append(res)
 
             for event in contract.events_declared:
@@ -82,7 +84,8 @@ Solidity defines a [naming convention](https://solidity.readthedocs.io/en/v0.4.2
                     info = ["Event ", event, " is not in CapWords\n"]
 
                     res = self.generate_result(info)
-                    res.add(event, {"target": "event", "convention": "CapWords"})
+                    res.add(event, {"target": "event",
+                            "convention": "CapWords"})
                     results.append(res)
 
             for func in contract.functions_declared:
@@ -99,76 +102,82 @@ Solidity defines a [naming convention](https://solidity.readthedocs.io/en/v0.4.2
                     info = ["Function ", func, " is not in mixedCase\n"]
 
                     res = self.generate_result(info)
-                    res.add(func, {"target": "function", "convention": "mixedCase"})
+                    res.add(func, {"target": "function",
+                            "convention": "mixedCase"})
                     results.append(res)
 
-                for argument in func.parameters:
-                    # Ignore parameter names that are not specified i.e. empty strings
-                    if argument.name == "":
-                        continue
-                    if argument in func.variables_read_or_written:
-                        correct_naming = self.is_mixed_case(argument.name)
-                    else:
-                        correct_naming = self.is_mixed_case_with_underscore(argument.name)
-                    if not correct_naming:
-                        info = ["Parameter ", argument, " is not in mixedCase\n"]
+                # for argument in func.parameters:
+                #     # Ignore parameter names that are not specified i.e. empty strings
+                #     if argument.name == "":
+                #         continue
+                #     if argument in func.variables_read_or_written:
+                #         correct_naming = self.is_mixed_case(argument.name)
+                #     else:
+                #         correct_naming = self.is_mixed_case_with_underscore(
+                #             argument.name)
+                #     if not correct_naming:
+                #         info = ["Parameter ", argument,
+                #                 " is not in mixedCase\n"]
 
-                        res = self.generate_result(info)
-                        res.add(argument, {"target": "parameter", "convention": "mixedCase"})
-                        results.append(res)
+                #         res = self.generate_result(info)
+                #         res.add(
+                #             argument, {"target": "parameter", "convention": "mixedCase"})
+                #         results.append(res)
 
-            for var in contract.state_variables_declared:
-                if self.should_avoid_name(var.name):
-                    if not self.is_upper_case_with_underscores(var.name):
-                        info = [
-                            "Variable ",
-                            var,
-                            " used l, O, I, which should not be used\n",
-                        ]
+            # for var in contract.state_variables_declared:
+            #     if self.should_avoid_name(var.name):
+            #         if not self.is_upper_case_with_underscores(var.name):
+            #             info = [
+            #                 "Variable ",
+            #                 var,
+            #                 " used l, O, I, which should not be used\n",
+            #             ]
 
-                        res = self.generate_result(info)
-                        res.add(
-                            var,
-                            {
-                                "target": "variable",
-                                "convention": "l_O_I_should_not_be_used",
-                            },
-                        )
-                        results.append(res)
+            #             res = self.generate_result(info)
+            #             res.add(
+            #                 var,
+            #                 {
+            #                     "target": "variable",
+            #                     "convention": "l_O_I_should_not_be_used",
+            #                 },
+            #             )
+            #             results.append(res)
 
-                if var.is_constant is True:
-                    # For ERC20 compatibility
-                    if var.name in ["symbol", "name", "decimals"]:
-                        continue
+            #     if var.is_constant is True:
+            #         # For ERC20 compatibility
+            #         if var.name in ["symbol", "name", "decimals"]:
+            #             continue
 
-                    if not self.is_upper_case_with_underscores(var.name):
-                        info = [
-                            "Constant ",
-                            var,
-                            " is not in UPPER_CASE_WITH_UNDERSCORES\n",
-                        ]
+            #         if not self.is_upper_case_with_underscores(var.name):
+            #             info = [
+            #                 "Constant ",
+            #                 var,
+            #                 " is not in UPPER_CASE_WITH_UNDERSCORES\n",
+            #             ]
 
-                        res = self.generate_result(info)
-                        res.add(
-                            var,
-                            {
-                                "target": "variable_constant",
-                                "convention": "UPPER_CASE_WITH_UNDERSCORES",
-                            },
-                        )
-                        results.append(res)
+            #             res = self.generate_result(info)
+            #             res.add(
+            #                 var,
+            #                 {
+            #                     "target": "variable_constant",
+            #                     "convention": "UPPER_CASE_WITH_UNDERSCORES",
+            #                 },
+            #             )
+            #             results.append(res)
 
-                else:
-                    if var.visibility == "private":
-                        correct_naming = self.is_mixed_case_with_underscore(var.name)
-                    else:
-                        correct_naming = self.is_mixed_case(var.name)
-                    if not correct_naming:
-                        info = ["Variable ", var, " is not in mixedCase\n"]
+            #     else:
+            #         if var.visibility == "private":
+            #             correct_naming = self.is_mixed_case_with_underscore(
+            #                 var.name)
+            #         else:
+            #             correct_naming = self.is_mixed_case(var.name)
+            #         if not correct_naming:
+            #             info = ["Variable ", var, " is not in mixedCase\n"]
 
-                        res = self.generate_result(info)
-                        res.add(var, {"target": "variable", "convention": "mixedCase"})
-                        results.append(res)
+            #             res = self.generate_result(info)
+            #             res.add(var, {"target": "variable",
+            #                     "convention": "mixedCase"})
+            #             results.append(res)
 
             for enum in contract.enums_declared:
                 if not self.is_cap_words(enum.name):
@@ -183,7 +192,8 @@ Solidity defines a [naming convention](https://solidity.readthedocs.io/en/v0.4.2
                     info = ["Modifier ", modifier, " is not in mixedCase\n"]
 
                     res = self.generate_result(info)
-                    res.add(modifier, {"target": "modifier", "convention": "mixedCase"})
+                    res.add(modifier, {"target": "modifier",
+                            "convention": "mixedCase"})
                     results.append(res)
 
         return results

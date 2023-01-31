@@ -125,13 +125,16 @@ def _process(
 
     if not printer_classes:
         detector_results = slither.run_detectors()
-        detector_results = [x for x in detector_results if x]  # remove empty results
-        detector_results = [item for sublist in detector_results for item in sublist]  # flatten
+        # remove empty results
+        detector_results = [x for x in detector_results if x]
+        detector_results = [
+            item for sublist in detector_results for item in sublist]  # flatten
         results_detectors.extend(detector_results)
 
     else:
         printer_results = slither.run_printers()
-        printer_results = [x for x in printer_results if x]  # remove empty results
+        # remove empty results
+        printer_results = [x for x in printer_results if x]
         results_printers.extend(printer_results)
 
     return slither, results_detectors, results_printers, analyzed_contracts_count
@@ -168,10 +171,12 @@ def get_detectors_and_printers() -> Tuple[
 ]:
 
     detectors_ = [getattr(all_detectors, name) for name in dir(all_detectors)]
-    detectors = [d for d in detectors_ if inspect.isclass(d) and issubclass(d, AbstractDetector)]
+    detectors = [d for d in detectors_ if inspect.isclass(
+        d) and issubclass(d, AbstractDetector)]
 
     printers_ = [getattr(all_printers, name) for name in dir(all_printers)]
-    printers = [p for p in printers_ if inspect.isclass(p) and issubclass(p, AbstractPrinter)]
+    printers = [p for p in printers_ if inspect.isclass(
+        p) and issubclass(p, AbstractPrinter)]
 
     # Handle plugins!
     for entry_point in iter_entry_points(group="slither_analyzer.plugin", name=None):
@@ -186,7 +191,8 @@ def get_detectors_and_printers() -> Tuple[
             )
         printer = None
         if not all(issubclass(printer, AbstractPrinter) for printer in plugin_printers):
-            raise Exception(f"Error when loading plugin {entry_point}, {printer} is not a printer")
+            raise Exception(
+                f"Error when loading plugin {entry_point}, {printer} is not a printer")
 
         # We convert those to lists in case someone returns a tuple
         detectors += list(plugin_detectors)
@@ -230,13 +236,15 @@ def choose_detectors(
             d for d in detectors_to_run if d.IMPACT != DetectorClassification.INFORMATIONAL
         ]
     if args.exclude_low and not args.fail_low:
-        detectors_to_run = [d for d in detectors_to_run if d.IMPACT != DetectorClassification.LOW]
+        detectors_to_run = [
+            d for d in detectors_to_run if d.IMPACT != DetectorClassification.LOW]
     if args.exclude_medium and not args.fail_medium:
         detectors_to_run = [
             d for d in detectors_to_run if d.IMPACT != DetectorClassification.MEDIUM
         ]
     if args.exclude_high and not args.fail_high:
-        detectors_to_run = [d for d in detectors_to_run if d.IMPACT != DetectorClassification.HIGH]
+        detectors_to_run = [
+            d for d in detectors_to_run if d.IMPACT != DetectorClassification.HIGH]
     if args.detectors_to_exclude:
         detectors_to_run = [
             d for d in detectors_to_run if d.ARGUMENT not in args.detectors_to_exclude
@@ -557,9 +565,11 @@ def parse_args(
     )
 
     # debugger command
-    parser.add_argument("--debug", help=argparse.SUPPRESS, action="store_true", default=False)
+    parser.add_argument("--debug", help=argparse.SUPPRESS,
+                        action="store_true", default=False)
 
-    parser.add_argument("--markdown", help=argparse.SUPPRESS, action=OutputMarkdown, default=False)
+    parser.add_argument("--markdown", help=argparse.SUPPRESS,
+                        action=OutputMarkdown, default=False)
 
     parser.add_argument(
         "--wiki-detectors", help=argparse.SUPPRESS, action=OutputWiki, default=False
@@ -595,7 +605,8 @@ def parse_args(
     )
 
     # if the json is splitted in different files
-    parser.add_argument("--splitted", help=argparse.SUPPRESS, action="store_true", default=False)
+    parser.add_argument("--splitted", help=argparse.SUPPRESS,
+                        action="store_true", default=False)
 
     # Disable the throw/catch on partial analyses
     parser.add_argument(
@@ -615,7 +626,8 @@ def parse_args(
     args.json_types = set(args.json_types.split(","))
     for json_type in args.json_types:
         if json_type not in JSON_OUTPUT_TYPES:
-            raise Exception(f'Error: "{json_type}" is not a valid JSON result output type.')
+            raise Exception(
+                f'Error: "{json_type}" is not a valid JSON result output type.')
 
     return args
 
@@ -730,7 +742,8 @@ def main_impl(
         cp.enable()
 
     # Set colorization option
-    set_colorization_enabled(False if args.disable_color else sys.stdout.isatty())
+    set_colorization_enabled(
+        False if args.disable_color else sys.stdout.isatty())
 
     # Define some variables for potential JSON output
     json_results = {}
@@ -747,7 +760,8 @@ def main_impl(
     # If we are outputting JSON, capture all standard output. If we are outputting to stdout, we block typical stdout
     # output.
     if outputting_json or output_to_sarif:
-        StandardOutputCapture.enable(outputting_json_stdout or outputting_sarif_stdout)
+        StandardOutputCapture.enable(
+            outputting_json_stdout or outputting_sarif_stdout)
 
     printer_classes = choose_printers(args, all_printer_classes)
     detector_classes = choose_detectors(args, all_detector_classes)
@@ -833,7 +847,8 @@ def main_impl(
                 for slither_instance in slither_instances:
                     assert slither_instance.crytic_compile
                     compilation_results.append(
-                        generate_standard_export(slither_instance.crytic_compile)
+                        generate_standard_export(
+                            slither_instance.crytic_compile)
                     )
                 json_results["compilations"] = compilation_results
 
@@ -848,7 +863,8 @@ def main_impl(
             # Add our detector types to JSON
             if "list-detectors" in args.json_types:
                 detectors, _ = get_detectors_and_printers()
-                json_results["list-detectors"] = output_detectors_json(detectors)
+                json_results["list-detectors"] = output_detectors_json(
+                    detectors)
 
             # Add our detector types to JSON
             if "list-printers" in args.json_types:
@@ -863,7 +879,8 @@ def main_impl(
         if number_contracts == 0:
             logger.warning(red("No contract was analyzed"))
         if printer_classes:
-            logger.info("%s analyzed (%d contracts)", filename, number_contracts)
+            logger.info("%s analyzed (%d contracts)",
+                        filename, number_contracts)
         else:
             logger.info(
                 "%s analyzed (%d contracts with %d detectors), %d result(s) found",
@@ -878,12 +895,14 @@ def main_impl(
         traceback.print_exc()
         logging.error(red("Error:"))
         logging.error(red(output_error))
-        logging.error("Please report an issue to https://github.com/crytic/slither/issues")
+        logging.error(
+            "Please report an issue to https://github.com/crytic/slither/issues")
 
     except Exception:  # pylint: disable=broad-except
         output_error = traceback.format_exc()
         traceback.print_exc()
-        logging.error(f"Error in {args.filename}")  # pylint: disable=logging-fstring-interpolation
+        logging.error(
+            f"Error in {args.filename}")  # pylint: disable=logging-fstring-interpolation
         logging.error(output_error)
 
     # If we are outputting JSON, capture the redirected output and disable the redirect to output the final JSON.
@@ -894,7 +913,8 @@ def main_impl(
                 "stderr": StandardOutputCapture.get_stderr_output(),
             }
         StandardOutputCapture.disable()
-        output_to_json(None if outputting_json_stdout else args.json, output_error, json_results)
+        output_to_json(None if outputting_json_stdout else args.json,
+                       output_error, json_results)
 
     if outputting_sarif:
         StandardOutputCapture.disable()
@@ -911,7 +931,8 @@ def main_impl(
         stats.print_stats()
 
     if args.fail_high:
-        fail_on_detection = any(result["impact"] == "High" for result in results_detectors)
+        fail_on_detection = any(
+            result["impact"] == "High" for result in results_detectors)
     elif args.fail_medium:
         fail_on_detection = any(
             result["impact"] in ["Medium", "High"] for result in results_detectors

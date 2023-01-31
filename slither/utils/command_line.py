@@ -75,15 +75,18 @@ def read_config_file(args: argparse.Namespace) -> None:
                 for key, elem in config.items():
                     if key not in defaults_flag_in_config:
                         logger.info(
-                            yellow(f"{args.config_file} has an unknown key: {key} : {elem}")
+                            yellow(
+                                f"{args.config_file} has an unknown key: {key} : {elem}")
                         )
                         continue
                     if getattr(args, key) == defaults_flag_in_config[key]:
                         setattr(args, key, elem)
         except json.decoder.JSONDecodeError as e:
-            logger.error(red(f"Impossible to read {args.config_file}, please check the file {e}"))
+            logger.error(
+                red(f"Impossible to read {args.config_file}, please check the file {e}"))
     else:
-        logger.error(red(f"File {args.config_file} is not a file or does not exist"))
+        logger.error(
+            red(f"File {args.config_file} is not a file or does not exist"))
         logger.error(yellow("Falling back to the default settings..."))
 
 
@@ -113,11 +116,13 @@ def output_to_markdown(
 
     # Sort by impact, confidence, and name
     detectors_list = sorted(
-        detectors_list, key=lambda element: (element[2], element[3], element[0])
+        detectors_list, key=lambda element: (
+            element[2], element[3], element[0])
     )
     idx = 1
     for (argument, help_info, impact, confidence) in detectors_list:
-        print(f"{idx} | `{argument}` | {help_info} | {classification_txt[impact]} | {confidence}")
+        print(
+            f"{idx} | `{argument}` | {help_info} | {classification_txt[impact]} | {confidence}")
         idx = idx + 1
 
     print()
@@ -170,6 +175,7 @@ def output_results_to_markdown(all_results: List[Dict], checklistlimit: str) -> 
         info[results_["check"]] = {
             "impact": results_["impact"],
             "confidence": results_["confidence"],
+            "wiki": results_["wiki"]
         }
 
     print("Summary")
@@ -181,21 +187,26 @@ def output_results_to_markdown(all_results: List[Dict], checklistlimit: str) -> 
     counter = 0
     for (check, results) in checks.items():
         print(f"## {check}")
-        print(f'Impact: {info[check]["impact"]}')
-        print(f'Confidence: {info[check]["confidence"]}')
+        print(f'**Impact**: {info[check]["impact"]}')
+        print(f'**Confidence**: {info[check]["confidence"]}')
+        print(f'**Description**: {info[check]["wiki"]}')
         additional = False
         if checklistlimit and len(results) > 5:
             results = results[0:5]
             additional = True
+        print("| # | Description| Source map |")
+        print("| --- | ------ | ----- |")
         for result in results:
-            print(" - [ ] ID-" + f"{counter}")
+            print(f"|{counter} ", end='')
             counter = counter + 1
-            print(result["markdown"])
+            desc = result["markdown"].strip().split(':')[0]
+            print(f'| {desc} |', end='')
             if result["first_markdown_element"]:
-                print(result["first_markdown_element"])
-                print("\n")
+                print(f'{result["first_markdown_element"]} |')
+                # print("\n")
         if additional:
-            print(f"**More results were found, check [{checklistlimit}]({checklistlimit})**")
+            print(
+                f"**More results were found, check [{checklistlimit}]({checklistlimit})**")
 
 
 def output_wiki(detector_classes: List[Type[AbstractDetector]], filter_wiki: str) -> None:
@@ -203,7 +214,8 @@ def output_wiki(detector_classes: List[Type[AbstractDetector]], filter_wiki: str
     # Sort by impact, confidence, and name
     detectors_list = sorted(
         detector_classes,
-        key=lambda element: (element.IMPACT, element.CONFIDENCE, element.ARGUMENT),
+        key=lambda element: (
+            element.IMPACT, element.CONFIDENCE, element.ARGUMENT),
     )
 
     for detector in detectors_list:
@@ -246,15 +258,18 @@ def output_detectors(detector_classes: List[Type[AbstractDetector]]) -> None:
         impact = detector.IMPACT
         confidence = classification_txt[detector.CONFIDENCE]
         detectors_list.append((argument, help_info, impact, confidence))
-    table = MyPrettyTable(["Num", "Check", "What it Detects", "Impact", "Confidence"])
+    table = MyPrettyTable(
+        ["Num", "Check", "What it Detects", "Impact", "Confidence"])
 
     # Sort by impact, confidence, and name
     detectors_list = sorted(
-        detectors_list, key=lambda element: (element[2], element[3], element[0])
+        detectors_list, key=lambda element: (
+            element[2], element[3], element[0])
     )
     idx = 1
     for (argument, help_info, impact, confidence) in detectors_list:
-        table.add_row([str(idx), argument, help_info, classification_txt[impact], confidence])
+        table.add_row([str(idx), argument, help_info,
+                      classification_txt[impact], confidence])
         idx = idx + 1
     print(table)
 
@@ -291,7 +306,8 @@ def output_detectors_json(
 
     # Sort by impact, confidence, and name
     detectors_list = sorted(
-        detectors_list, key=lambda element: (element[2], element[3], element[0])
+        detectors_list, key=lambda element: (
+            element[2], element[3], element[0])
     )
     idx = 1
     table = []
@@ -365,7 +381,8 @@ def check_and_sanitize_markdown_root(markdown_root: str) -> str:
     )
     if match:
         if markdown_root[-1] != "/":
-            logger.warning("Appending '/' in markdown_root url for better code referencing")
+            logger.warning(
+                "Appending '/' in markdown_root url for better code referencing")
             markdown_root = markdown_root + "/"
 
         if not match.group(4):
